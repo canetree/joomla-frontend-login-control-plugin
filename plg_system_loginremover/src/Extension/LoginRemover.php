@@ -25,7 +25,7 @@ final class LoginRemover extends CMSPlugin implements SubscriberInterface
     public static function getSubscribedEvents(): array
     {
         return [
-            'onBeforeCompileHead' => 'onBeforeCompileHead',
+            'onBeforeRender' => 'onBeforeRender',
         ];
     }
 
@@ -34,7 +34,7 @@ final class LoginRemover extends CMSPlugin implements SubscriberInterface
      *
      * @return void
      */
-    public function onBeforeCompileHead(): void
+    public function onBeforeRender(): void
     {
         $app = Factory::getApplication();
 
@@ -43,31 +43,19 @@ final class LoginRemover extends CMSPlugin implements SubscriberInterface
             return;
         }
 
+        // Get document
+        $document = $app->getDocument();
+        
+        // Only proceed if we have an HTML document
+        if (!method_exists($document, 'addStyleDeclaration')) {
+            return;
+        }
+
         $removeForgotPassword = (int) $this->params->get('remove_forgot_password', 1);
         $removeForgotUsername = (int) $this->params->get('remove_forgot_username', 1);
         $removeCreateAccount  = (int) $this->params->get('remove_create_account', 0);
 
         $css = [];
-
-        /**
-         * MODULE (SP Page Builder) MARKUP:
-         * --------------------------------
-         * <ul class="mod-login__options list-unstyled">
-         *   <li><a href="/component/users/reset.html">Forgot your password?</a></li>
-         *   <li><a href="/component/users/remind.html">Forgot your username?</a></li>
-         * </ul>
-         *
-         * COM_USERS LOGIN PAGE MARKUP:
-         * ---------------------------
-         * <a class="com-users-login__remind list-group-item"
-         *    href="/component/users/remind.html">Forgot your username?</a>
-         *
-         * Possibly also:
-         * <a class="com-users-login__reset list-group-item"
-         *    href="/component/users/reset.html">Forgot your password?</a>
-         *
-         * We target both module and component output.
-         */
 
         // Forgot password
         if ($removeForgotPassword) {
@@ -82,7 +70,10 @@ final class LoginRemover extends CMSPlugin implements SubscriberInterface
                 /* com_users login view */
                 a.com-users-login__reset[href*="/component/users/reset"],
                 a.com-users-login__reset[href*="view=reset"],
-                a.com-users-login__reset[href*="task=user.reset"]
+                a.com-users-login__reset[href*="task=user.reset"],
+                /* Additional selectors */
+                .login-links a[href*="reset"],
+                .mod-login a[href*="reset"]
                 {
                     display: none !important;
                 }
@@ -102,14 +93,17 @@ final class LoginRemover extends CMSPlugin implements SubscriberInterface
                 /* com_users login view */
                 a.com-users-login__remind[href*="/component/users/remind"],
                 a.com-users-login__remind[href*="view=remind"],
-                a.com-users-login__remind[href*="task=user.remind"]
+                a.com-users-login__remind[href*="task=user.remind"],
+                /* Additional selectors */
+                .login-links a[href*="remind"],
+                .mod-login a[href*="remind"]
                 {
                     display: none !important;
                 }
             ';
         }
 
-        // Create account (module + possible com_users login links)
+        // Create account
         if ($removeCreateAccount) {
             $css[] = '
                 /* Module links */
@@ -119,10 +113,13 @@ final class LoginRemover extends CMSPlugin implements SubscriberInterface
                 ul.mod-login__options li > a[href*="/component/users/registration"],
                 ul.mod-login__options li > a[href*="view=registration"],
                 ul.mod-login__options li > a[href*="task=user.register"],
-                /* com_users login view (common patterns) */
+                /* com_users login view */
                 a[href*="/component/users/registration"].list-group-item,
                 a[href*="view=registration"].list-group-item,
-                a[href*="task=user.register"].list-group-item
+                a[href*="task=user.register"].list-group-item,
+                /* Additional selectors */
+                .login-links a[href*="registration"],
+                .mod-login a[href*="registration"]
                 {
                     display: none !important;
                 }
@@ -130,7 +127,6 @@ final class LoginRemover extends CMSPlugin implements SubscriberInterface
         }
 
         if ($css) {
-            $document = $app->getDocument();
             $document->addStyleDeclaration(implode("\n", $css));
         }
     }
